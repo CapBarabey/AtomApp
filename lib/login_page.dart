@@ -1,7 +1,25 @@
+import 'dart:convert';
+import 'package:atom_login_page/home_page.dart';
+import 'package:atom_login_page/login_post.dart';
+import 'package:atom_login_page/reset_password_page.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
 final _loginForm = GlobalKey<FormState>();
+
+Future<LoginResponse> logIn(String email, String password) async {
+  Map<String, dynamic> request ={
+    'email': email,
+    'password': password,
+  };
+
+  final uri = Uri.parse('https://api.saletoyou.net/auth/login');
+  final response = await http.post(uri, body: request);
+
+  return LoginResponse.fromJson(json.decode(response.body) as Map<String, dynamic>);
+}
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -11,11 +29,22 @@ class LoginPage extends StatefulWidget {
 }
 
 class _LoginPageState extends State<LoginPage> {
+  late String _userEmail = '';
+  late String _userPassword = '';
+
+  @override
+  void initState() {
+    super.initState();
+    loadUserCredentials();
+  }
+
   late Color myColor;
   late Size mediaSize;
   TextEditingController emailController = TextEditingController();
   TextEditingController passwordController = TextEditingController();
   bool rememberUser = false;
+  bool _isLogin = false;
+  Future<LoginResponse>? _futureLoginResponse;
 
   static String? validateEmail(String? emailController) {
     RegExp emailRegEx = RegExp(r'^[\w\\.-]+@[\w-]+\.\w{2,3}(\.\w{2,3})?$');
@@ -27,8 +56,7 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
- static String? validatePassword(String? passwordController) {
-    debugPrint("Validation work!");
+  static String? validatePassword(String? passwordController) {
     return passwordController!.length < 3 ? "Enter correct password" : null;
   }
 
@@ -126,7 +154,7 @@ class _LoginPageState extends State<LoginPage> {
              const SizedBox(height: 20),
              _buildRememberCheckBox(),
              const SizedBox(height: 20),
-             _buildLoginButton(),
+             _buildLoginButton(context),
            ],
          ),
        ),
@@ -146,10 +174,10 @@ class _LoginPageState extends State<LoginPage> {
   Widget _buildInputField(TextEditingController controller,
   {isPassword = false}) {
     return TextFormField(
-      controller: controller,
+      controller: controller..text = isPassword ? _userPassword : _userEmail,
       validator: (String? value) => isPassword ? validatePassword(controller.text) : validateEmail(controller.text),
       decoration: InputDecoration(
-        suffixIcon: isPassword ? Icon(Icons.password) : Icon(Icons.mail),
+        suffixIcon: isPassword ? const Icon(Icons.password) : const Icon(Icons.mail),
       ),
       obscureText: isPassword,
     );
@@ -169,14 +197,17 @@ class _LoginPageState extends State<LoginPage> {
             _buildGreyText("Remember me"),
           ],
         ),
-
-        TextButton(
-          onPressed: (){
-            debugPrint("Forgot password");
-            debugPrint("$rememberUser");
-          },
-          child: Padding(
-            padding: const EdgeInsets.only(left: 30),
+        Padding(
+          padding: const EdgeInsets.only(left: 40),
+          child: TextButton(
+            onPressed: (){
+              debugPrint("Forgot password");
+              Navigator.push(
+                context, MaterialPageRoute(
+                  builder: (context) => const ResetPassword()
+                ),
+              );
+            },
             child: _buildGreyText("Forgot password"),
           ),
         ),
@@ -184,12 +215,45 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
-  Widget _buildLoginButton() {
+  Widget _buildLoginButton(BuildContext context) {
     return ElevatedButton(
       onPressed: () {
-        _loginForm.currentState!.validate();
-        debugPrint("Email: ${emailController.text}");
-        debugPrint("Password: ${passwordController.text}");
+        if (_loginForm.currentState!.validate() == true) {
+          _futureLoginResponse = logIn(emailController.text, passwordController.text);
+          debugPrint("${_loginForm.currentState!.validate()}");
+          debugPrint("Email: ${emailController.text}");
+          debugPrint("Password: ${passwordController.text}");
+          if (rememberUser == true) {
+            saveUserCredentials(emailController.text, passwordController.text, rememberUser);
+          } else {
+            removeUserCredentials();
+          }
+          showDialog(
+              context: context,
+              builder: (context) => AlertDialog(
+                title: const Text("Login Info"),
+                content: loginResponse(),
+                actions: [
+                  Center(
+                    child: ElevatedButton(
+                        onPressed: () {
+                          if (_isLogin == false) { //remake to true
+                            Navigator.push(
+                              context, MaterialPageRoute(
+                                builder: (context) => const HomePage()
+                              ),
+                            );
+                          } else {
+                            Navigator.pop(context);
+                          }
+                        },
+                        child: const Text("OK"),
+                    ),
+                  )
+                ],
+              )
+          );
+        }
       },
       style: ElevatedButton.styleFrom(
         shape: const StadiumBorder(),
@@ -199,6 +263,66 @@ class _LoginPageState extends State<LoginPage> {
       ),
       child: const Text("LOGIN"),
     );
+  }
+
+  FutureBuilder<LoginResponse> loginResponse() {
+    return FutureBuilder<LoginResponse>(
+      future: _futureLoginResponse,
+      builder: (context, snapshot) {
+        if (snapshot.hasData && snapshot.data!.status != "error") {
+          _isLogin = true;
+          saveUserData(snapshot.data!.data, snapshot.data!.data!['email']);
+          return Text(snapshot.data!.message);
+        } else if(snapshot.hasError) {
+          return Text('${snapshot.error}');
+        } else if(snapshot.hasData &&  snapshot.data!.status == "error") {
+          return Text(snapshot.data!.message);
+        }
+        return const Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Center(
+              child: CircularProgressIndicator(),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> saveUserCredentials(String userEmail, String userPassword, bool remember) async {
+    final storage = await SharedPreferences.getInstance();
+    setState(() {
+      storage.setString('email', userEmail);
+      storage.setString('password', userPassword);
+      storage.setBool('remember', remember);
+      debugPrint('saved');
+    });
+  }
+
+  Future<void> saveUserData(Map<String, dynamic>? userData, String userEmail) async {
+    final storage = await SharedPreferences.getInstance();
+    setState(() {
+      storage.setString('email', userEmail);
+      storage.setString('data', userData as String);
+    });
+  }
+
+  Future<void> loadUserCredentials() async {
+    final storage = await SharedPreferences.getInstance();
+    setState(() {
+      debugPrint('initialize');
+      _userEmail = storage.getString('email') ?? '';
+      _userPassword = storage.getString('password') ?? '';
+      rememberUser = storage.getBool('remember') ?? false;
+    });
+  }
+
+  Future<void> removeUserCredentials() async {
+    final storage = await SharedPreferences.getInstance();
+    await storage.remove('email',);
+    await storage.remove('password',);
+    await storage.remove('remember',);
   }
 
 }

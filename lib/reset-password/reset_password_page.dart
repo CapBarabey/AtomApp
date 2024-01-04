@@ -1,9 +1,10 @@
-import 'package:atom_login_page/login_page.dart';
+import 'package:atom_login_page/login/login_page.dart';
 import 'package:flutter/cupertino.dart';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:atom_login_page/reset_post.dart';
+
+import '../api_response.dart';
 
 final _resetForm = GlobalKey<FormState>();
 
@@ -20,7 +21,7 @@ class _ResetPasswordState extends State<ResetPassword> {
 
   TextEditingController emailController = TextEditingController();
 
-  Future<ResetResponse>? _futureResetResponse;
+  Future<ApiResponse>? _futureResetResponse;
   bool responseErrorState = false;
 
   static String? validateEmail(String? emailController) {
@@ -209,7 +210,7 @@ class _ResetPasswordState extends State<ResetPassword> {
     );
   }
 
-  FutureBuilder<ResetResponse> resetResponse() {
+  FutureBuilder<ApiResponse> resetResponse() {
     return FutureBuilder(
         future: _futureResetResponse,
         builder: (context, snapshot) {
@@ -237,7 +238,7 @@ class _ResetPasswordState extends State<ResetPassword> {
 
 }
 
-Future<ResetResponse> resetPassword(String email) async {
+Future<ApiResponse> resetPassword(String email) async {
   Map<String, dynamic> request ={
     'email': email,
   };
@@ -245,5 +246,5 @@ Future<ResetResponse> resetPassword(String email) async {
   final uri = Uri.parse('https://api.saletoyou.net/auth/reset-password');
   final response = await http.post(uri, body: request);
 
-  return ResetResponse.fromJson(json.decode(response.body) as Map<String, dynamic>);
+  return ApiResponse.fromJson(json.decode(response.body) as Map<String, dynamic>);
 }

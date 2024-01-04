@@ -1,10 +1,8 @@
-import 'package:atom_login_page/home_page.dart';
-import 'package:atom_login_page/login_page.dart';
+import 'package:atom_login_page/home-page/home_page.dart';
+import 'package:atom_login_page/login/login_page.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
-
 
 class SideMenu extends StatelessWidget {
   final String email;
@@ -31,7 +29,7 @@ class SideMenu extends StatelessWidget {
                   'Menu',
                   style: TextStyle(color: Colors.white, fontSize: 25),
                 ),
-                const SizedBox(height: 65),
+                const SizedBox(height: 60),
                 Text(
                     email,
                     style: const TextStyle(color: Colors.white, fontSize: 18),

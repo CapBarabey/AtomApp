@@ -1,24 +1,25 @@
 import 'dart:convert';
-import 'package:atom_login_page/home_page.dart';
-import 'package:atom_login_page/login_post.dart';
-import 'package:atom_login_page/reset_password_page.dart';
-import 'package:flutter/cupertino.dart';
+import 'package:atom_login_page/home-page/home_page.dart';
+import 'package:atom_login_page/reset-password/reset_password_page.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../api_response.dart';
+
 final _loginForm = GlobalKey<FormState>();
 
-Future<LoginResponse> logIn(String email, String password) async {
-  Map<String, dynamic> request ={
+Future<ApiResponse> logIn(String email, String password) async {
+  Map<String, dynamic> query ={
     'email': email,
-    'password': password,
+    'password': password
   };
+  var request = jsonEncode(query);
 
   final uri = Uri.parse('https://api.saletoyou.net/auth/login');
   final response = await http.post(uri, body: request);
 
-  return LoginResponse.fromJson(json.decode(response.body) as Map<String, dynamic>);
+  return ApiResponse.fromJson(json.decode(response.body) as Map<String, dynamic>);
 }
 
 class LoginPage extends StatefulWidget {
@@ -44,7 +45,7 @@ class _LoginPageState extends State<LoginPage> {
   TextEditingController passwordController = TextEditingController();
   bool rememberUser = false;
   bool _isLogin = false;
-  Future<LoginResponse>? _futureLoginResponse;
+  Future<ApiResponse>? _futureLoginResponse;
 
   static String? validateEmail(String? emailController) {
     RegExp emailRegEx = RegExp(r'^[\w\\.-]+@[\w-]+\.\w{2,3}(\.\w{2,3})?$');
@@ -171,8 +172,7 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
-  Widget _buildInputField(TextEditingController controller,
-  {isPassword = false}) {
+  Widget _buildInputField(TextEditingController controller, {isPassword = false}) {
     return TextFormField(
       controller: controller..text = isPassword ? _userPassword : _userEmail,
       validator: (String? value) => isPassword ? validatePassword(controller.text) : validateEmail(controller.text),
@@ -186,19 +186,14 @@ class _LoginPageState extends State<LoginPage> {
   Widget _buildRememberCheckBox() {
     return Row(
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Checkbox(value: rememberUser, onChanged: (value){
-              setState(() {
-                rememberUser = value!;
-              });
-            }),
-            _buildGreyText("Remember me"),
-          ],
-        ),
+        Checkbox(value: rememberUser, onChanged: (value){
+          setState(() {
+            rememberUser = value!;
+          });
+        }),
+        _buildGreyText("Remember me"),
         Padding(
-          padding: const EdgeInsets.only(left: 40),
+          padding: const EdgeInsets.only(left: 10),
           child: TextButton(
             onPressed: (){
               debugPrint("Forgot password");
@@ -220,9 +215,6 @@ class _LoginPageState extends State<LoginPage> {
       onPressed: () {
         if (_loginForm.currentState!.validate() == true) {
           _futureLoginResponse = logIn(emailController.text, passwordController.text);
-          debugPrint("${_loginForm.currentState!.validate()}");
-          debugPrint("Email: ${emailController.text}");
-          debugPrint("Password: ${passwordController.text}");
           if (rememberUser == true) {
             saveUserCredentials(emailController.text, passwordController.text, rememberUser);
           } else {
@@ -237,7 +229,7 @@ class _LoginPageState extends State<LoginPage> {
                   Center(
                     child: ElevatedButton(
                         onPressed: () {
-                          if (_isLogin == false) { //remake to true
+                          if (_isLogin == true) {
                             Navigator.push(
                               context, MaterialPageRoute(
                                 builder: (context) => const HomePage()
@@ -265,17 +257,20 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
-  FutureBuilder<LoginResponse> loginResponse() {
-    return FutureBuilder<LoginResponse>(
+  FutureBuilder<ApiResponse> loginResponse() {
+    return FutureBuilder<ApiResponse>(
       future: _futureLoginResponse,
       builder: (context, snapshot) {
-        if (snapshot.hasData && snapshot.data!.status != "error") {
+        if (snapshot.hasData && snapshot.data!.status == "success") {
+          debugPrint('success');
           _isLogin = true;
-          saveUserData(snapshot.data!.data, snapshot.data!.data!['email']);
+          saveUserData(snapshot.data?.data,);
           return Text(snapshot.data!.message);
         } else if(snapshot.hasError) {
+          debugPrint('internal error');
           return Text('${snapshot.error}');
         } else if(snapshot.hasData &&  snapshot.data!.status == "error") {
+          debugPrint('server error');
           return Text(snapshot.data!.message);
         }
         return const Column(
@@ -300,11 +295,12 @@ class _LoginPageState extends State<LoginPage> {
     });
   }
 
-  Future<void> saveUserData(Map<String, dynamic>? userData, String userEmail) async {
+  Future<void> saveUserData(Map<String, dynamic>? userData) async {
     final storage = await SharedPreferences.getInstance();
     setState(() {
-      storage.setString('email', userEmail);
-      storage.setString('data', userData as String);
+      storage.setString('userDataToken', userData?['token'] as String);
+      storage.setString('userDataEmail', userData?['email'] as String);
+      storage.setString('userDataRole', userData?['role'] as String);
     });
   }
 

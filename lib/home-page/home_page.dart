@@ -1,7 +1,8 @@
-import 'package:atom_login_page/side_menu.dart';
-import 'package:flutter/cupertino.dart';
+import 'package:atom_login_page/side-menu/side_menu.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import '../air/air-search/search_form.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -11,14 +12,14 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  late String userEmail;
+
+  late String userEmail = '';
+
   @override
   void initState() {
     super.initState();
     getUserEmail();
   }
-
-
 
   @override
   Widget build(BuildContext context) {
@@ -29,11 +30,14 @@ class _HomePageState extends State<HomePage> {
         centerTitle: true,
         backgroundColor: Theme.of(context).primaryColor,
       ),
+      body: const SingleChildScrollView(
+        child: SearchForm(),
+      ),
     );
   }
 
   Future<void> getUserEmail() async {
     final storage = await SharedPreferences.getInstance();
-    userEmail = storage.getString('email') ?? '';
+    userEmail = storage.getString('userDataEmail')!;
   }
 }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 
 class PassengersAndClass extends StatefulWidget {
   const PassengersAndClass({super.key});
@@ -8,11 +9,14 @@ class PassengersAndClass extends StatefulWidget {
 }
 
 class _PassengersAndClassState extends State<PassengersAndClass> {
+  late FToast fToast;
 
   @override
   void initState() {
     setState(() {
       classOption = economyClass;
+      passengersClassController.text = classPassBuilder();
+      fToast = FToast();
     });
     super.initState();
   }
@@ -26,12 +30,12 @@ class _PassengersAndClassState extends State<PassengersAndClass> {
   String economyClass = 'E';
   String businessClass = 'B';
 
-  String? classOption;
+  String? classOption = 'E';
 
   @override
   Widget build(BuildContext context) {
     return TextFormField(
-      initialValue: '1 adults, Economy',
+      controller: passengersClassController..text,
       decoration: const InputDecoration(
         labelText: 'Passengers and class',
         suffixIcon: Icon(Icons.flight_class),
@@ -58,6 +62,7 @@ class _PassengersAndClassState extends State<PassengersAndClass> {
                       const SizedBox(height: 20),
                       ElevatedButton(
                         onPressed: () {
+                          passengersClassController.text = classPassBuilder();
                           Navigator.pop(context);
                         },
                         child: const Text('OK')),
@@ -75,15 +80,31 @@ class _PassengersAndClassState extends State<PassengersAndClass> {
   Widget circleButton(String type, StateSetter setOptionState, {isRemoveButton = false}) {
     return ElevatedButton(
       onPressed: () {
-        if (isRemoveButton == false) {
+        if (isRemoveButton == false && totalPax() != 9) {
           switch(type) {
             case 'adults': setOptionState((){adults ++;});
             case 'children': setOptionState((){children ++;});
-            case 'infants': setOptionState((){infants ++;});
+            case 'infants':
+              if (infants < adults) {
+                setOptionState((){++ infants;});
+              } else if (infants == adults) {
+                Fluttertoast.showToast(
+                  msg: '1 infant without a seat is allowed per 1 adult passenger',
+                  gravity: ToastGravity.BOTTOM,
+                  timeInSecForIosWeb: 4,
+                  backgroundColor: Colors.blueGrey,
+                  textColor: Colors.black,
+                  fontSize: 3.0,
+                  toastLength: Toast.LENGTH_LONG
+              );
+            }
           }
         } else {
           switch(type) {
-            case 'adults': setOptionState((){adults --;});
+            case 'adults':
+              if (adults != 1) {
+                setOptionState((){adults --;});
+              }
             case 'children': setOptionState((){children --;});
             case 'infants': setOptionState((){infants --;});
           }
@@ -175,14 +196,44 @@ class _PassengersAndClassState extends State<PassengersAndClass> {
     );
   }
 
-  String valueBuilder() {
-    String? chosenClass;
-    String value ='  adults, $chosenClass';
+  classPassBuilder() {
+    var result = '$adults';
 
+    if (children > 0 || infants > 0) {
+      result = '$result udt';
+    } else {
+      result = result + getPlural(adults, ['adult', 'adults', 'adults']);
+    }
 
+    if (children > 0) {
+      result = '$result, $children chl';
+    }
 
+    if (infants > 0) {
+      result = '$result, $infants inf';
+    }
 
-    return value;
+    if (classOption == 'B') {
+      result = '$result, Business';
+    } else {
+      result = '$result, Economy';
+    }
+
+    return result;
+  }
+
+  getPlural(int num, List<String> values) {
+    if (num == 1) {
+      return values[0];
+    }
+    if (num < 5) {
+      return values[1];
+    }
+    return values[2];
+  }
+
+  totalPax() {
+    return adults + children + infants;
   }
 
 }
